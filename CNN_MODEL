@@ -1,0 +1,250 @@
+import os
+import random
+import shutil
+import numpy as np
+from shutil import copyfile
+from PIL import Image
+%matplotlib inline
+from sklearn.metrics import roc_auc_score
+import matplotlib.image as mpimg
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+import math
+# from tensorflow.keras.utils.np_utils import to_categorical # convert to one-hot-encoding
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPool2D
+from tensorflow.keras.optimizers import Adam
+import tensorflow as tf
+#from google.colab import files
+from keras.preprocessing import image
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras import layers 
+from tensorflow.keras import Model 
+import matplotlib.pyplot as plt
+import tensorflow.keras.losses
+
+# pip install tensorflow-gpu
+
+IMAGE_SIZE = [224, 224]
+train_path = '/workspace/intern_khushi/poultryfinal/train/'
+valid_path = '/workspace/intern_khushi/poultryfinal/valid/'
+test_path = '/workspace/intern_khushi/poultryfinal/test/'
+
+batch_size = 64 
+img_height, img_width = 224,224
+input_shape = (img_height, img_width, 3)
+
+random_seed = np.random.seed(42)
+
+train_datagen = ImageDataGenerator(
+    rescale=1. / 255,
+    zoom_range=0.5,
+    shear_range=0.5)
+
+train_generator = train_datagen.flow_from_directory(
+    train_path,
+    target_size=(img_height, img_width),
+    batch_size=batch_size,
+    shuffle = True,
+    class_mode='categorical')
+
+
+valid_datagen = ImageDataGenerator(
+    rescale=1. / 255,
+    zoom_range=0.5,
+    shear_range=0.5)
+
+validation_generator = valid_datagen.flow_from_directory(
+    valid_path,
+    target_size=(img_height, img_width),
+    batch_size=batch_size,
+    shuffle = False,
+    class_mode='categorical')
+
+
+test_datagen = ImageDataGenerator(
+    rescale=1. / 255)
+
+test_generator = test_datagen.flow_from_directory(
+    test_path,
+    target_size=(img_height, img_width),
+    batch_size=batch_size,
+    shuffle = False,
+    class_mode='categorical')
+
+import keras
+import tensorflow as tf
+from keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
+# from tensorflow.keras.applications.vgg16 import VGG16
+from tensorflow.keras import layers 
+from tensorflow.keras import Model 
+from tensorflow.keras.optimizers import RMSprop, Adam, SGD
+from tensorflow.keras.layers import BatchNormalization
+from keras import regularizers
+
+model = Sequential()
+model.add(Conv2D(filters=16, kernel_size=(3,3), padding='Same', activation='relu', input_shape=(img_height, img_width, 3)))
+# model.add(Conv2D(filters=16, kernel_size=(3,3), padding='Same', activation='relu', input_shape=(img_height, img_width, 3)))
+#model.add(BatchNormalization())
+model.add(MaxPool2D(pool_size=(2,2), strides=2))
+model.add(Dropout(0.25))
+
+model.add(Conv2D(filters=32, kernel_size=(3,3), padding='Same', activation='relu'))
+# model.add(Conv2D(filters=32, kernel_size=(3,3), padding='Same', activation='relu'))
+# model.add(BatchNormalization())
+model.add(MaxPool2D(pool_size=(2,2), strides=2))
+model.add(Dropout(0.25))
+
+
+model.add(Conv2D(filters=64, kernel_size=(3,3), padding='Same', activation='relu'))
+# model.add(Conv2D(filters=64, kernel_size=(3,3), padding='Same', activation='relu'))
+# model.add(BatchNormalization())
+model.add(MaxPool2D(pool_size=(2,2), strides=2))
+model.add(Dropout(0.25))
+
+
+model.add(Conv2D(filters=128, kernel_size=(3,3), padding='Same', activation='relu'))
+# model.add(Conv2D(filters=128, kernel_size=(3,3), padding='Same', activation='relu'))
+#model.add(BatchNormalization())
+model.add(MaxPool2D(pool_size=(2,2), strides=2))
+model.add(Dropout(0.25))
+
+
+model.add(Flatten())
+model.add(Dense(512, activation='relu'))
+model.add(Dropout(0.25))
+model.add(Dense(4, activation='softmax'))
+
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+annealer = ReduceLROnPlateau(monitor='accuracy', patience=0.5, verbose=1)
+filepath = '/temp/mymodel.h5'
+checkpoint = ModelCheckpoint(filepath, verbose=1, save_best_only=True, mode='auto', save_freq='epoch')
+model.summary()
+
+
+r= model.fit(train_generator,
+             epochs=100,
+             verbose=1,callbacks=[annealer, checkpoint],
+             validation_data=validation_generator)                                                          
+
+evl = model.evaluate(test_generator)
+
+test_loss, test_acc = evl[0]*100, evl[2]*100
+
+msg = f'Test Accuracy = {test_acc:5.2f} %'
+print(msg)
+
+nb_train_samples = len(train_generator.filenames)
+nb_validation_samples = len(validation_generator.filenames)
+nb_test_samples = len(test_generator.filenames)
+
+
+num_classes = len(train_generator.class_indices)
+
+print("nb_train_samples:", nb_train_samples)
+print("nb_validation_samples:", nb_validation_samples)
+print("nb_test_samples:", nb_test_samples)
+print("\n num_classes:", num_classes)
+
+plt.figure(figsize=(8,6))
+plt.bar(["train_generator", "validation_generator", "test_generator"], [nb_train_samples, nb_validation_samples, nb_test_samples], color=["maroon", "cyan", "seagreen"], width=0.4)
+plt.xlabel("Data")
+plt.ylabel("Numbers")
+plt.show()
+
+acc = r.history['accuracy']
+val_acc = r.history['val_accuracy']
+loss = r.history['loss']
+val_loss = r.history['val_loss']
+
+epochs = range(len(acc))
+
+plt.plot(epochs, acc, 'r')
+plt.plot(epochs, val_acc, 'b')
+plt.title('Training and Validation Accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'val'], loc='upper left')
+plt.figure()
+
+plt.plot(epochs, loss, 'r')
+plt.plot(epochs, val_loss, 'b')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'val'], loc='upper left')
+plt.title('Training and Validaion Loss')
+plt.figure()
+
+from matplotlib import cm
+
+model.load_weights(filepath)
+evl = model.evaluate(test_generator)
+test_loss, test_acc = evl[0]*100, evl[1]*100
+msg = f'Test Accuracy = {test_acc:5.2f} %'
+print(msg)
+
+pip install seaborn
+
+import keras
+import keras.utils
+from keras import utils as np_utils
+from keras.utils import to_categorical
+
+num_classes = len(train_generator.class_indices)
+test_labels = test_generator.classes
+test_labels = to_categorical(test_labels, num_classes=num_classes)
+y_true = [i.argmax() for i in test_labels]
+
+predictions = model.predict(test_generator, verbose=1)
+yPredictions = np.argmax(predictions, axis=1)
+true_classes = test_generator.classes
+confusion_mtx = confusion_matrix(true_classes, yPredictions) 
+y_pred_probabilities=yPredictions
+classnames=[]
+for classname in test_generator.class_indices:
+    classnames.append(classname)
+
+target_names = classnames
+print(classification_report(true_classes, yPredictions, target_names=target_names))
+
+from sklearn.metrics import classification_report
+import seaborn as sns
+import sklearn
+import pandas as pd
+print(classification_report( true_classes, yPredictions))
+cm_matrix = sklearn.metrics.confusion_matrix(true_classes, yPredictions)
+cm_matrix
+
+class_names=['coccidiosis', 'healthy', 'ncd','salmo'] # name  of classes
+fig, ax = plt.subplots()
+tick_marks = np.arange(len(class_names))
+plt.xticks(tick_marks, class_names)
+plt.yticks(tick_marks, class_names)
+# create heatmap
+sns.heatmap(pd.DataFrame(cm_matrix), annot=True,linewidths=.5, cmap="YlGnBu" ,fmt='g')
+ax.xaxis.set_label_position("top")
+plt.tight_layout()
+plt.title('Confusion matrix', y=1.1)
+plt.ylabel('Actual label')
+plt.xlabel('Predicted label')
+
+ax.xaxis.set_ticklabels(['coccidiosis','healthy','ncd','salmo'])
+ax.yaxis.set_ticklabels(['coccidiosis','healthy','ncd','salmo'])
+
+#UPDATE
+from sklearn.metrics import confusion_matrix
+total=sum(sum(confusion_mtx))
+
+sensitivity = confusion_mtx[0,0]/(confusion_mtx[0,0]+confusion_mtx[1,0])
+print('Sensitivity : ', sensitivity*100 )
+
+Specificity = confusion_mtx[1,1]/(confusion_mtx[1,1]+confusion_mtx[0,1])
+print('Specificity : ', Specificity*100 )
+
+
+
+
+
